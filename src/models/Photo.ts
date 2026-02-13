@@ -1,0 +1,40 @@
+import mongoose, { Schema, Document, Model } from 'mongoose';
+
+export interface IPhoto extends Document {
+  userId: string;
+  source: 'GOOGLE' | 'ICLOUD' | 'LOCAL';
+  externalId: string;
+  url: string;
+  thumbnailUrl?: string;
+  metadata: Record<string, any>;
+  lastDisplayedAt?: Date;
+  displayCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const PhotoSchema: Schema = new Schema(
+  {
+    userId: { type: String, required: true },
+    source: {
+      type: String,
+      enum: ['GOOGLE', 'ICLOUD', 'LOCAL'],
+      required: true,
+    },
+    externalId: { type: String, required: true }, // unique per user ideally, but global unique compliant
+    url: { type: String, required: true }, // Main URL or storage path
+    thumbnailUrl: { type: String },
+    metadata: { type: Map, of: Schema.Types.Mixed, default: {} },
+    lastDisplayedAt: { type: Date },
+    displayCount: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+// Index for efficient querying of next photo based on display history
+PhotoSchema.index({ lastDisplayedAt: 1, displayCount: 1 });
+
+const Photo: Model<IPhoto> =
+  mongoose.models.Photo || mongoose.model<IPhoto>('Photo', PhotoSchema);
+
+export default Photo;
