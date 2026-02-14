@@ -40,16 +40,21 @@ export async function GET(req: NextRequest) {
         const pickerSession = await getPickerSession(session.user.id, sessionId);
         
         let count = 0;
+        let errors: string[] = [];
+
         if (pickerSession.mediaItemsSet) {
             // Picking is done, fetch items
-            count = await listPickedMediaItems(session.user.id, sessionId);
+            const result = await listPickedMediaItems(session.user.id, sessionId);
+            count = result.count;
+            errors = result.errors;
         }
 
         return NextResponse.json({ 
             success: true, 
             session: pickerSession,
             mediaItemsSet: pickerSession.mediaItemsSet,
-            count
+            count,
+            errors
         });
     } catch (error) {
         console.error('Error polling picker session:', error);

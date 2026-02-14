@@ -11,6 +11,12 @@ export default function PhotoViewer() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
+
+  // Reset image error when photo changes
+  useEffect(() => {
+    setImgError(false);
+  }, [currentIndex]);
 
   const fetchPhotos = useCallback(async (count = 10) => {
     setLoading(true);
@@ -131,19 +137,60 @@ export default function PhotoViewer() {
     );
   }
 
+
+
+  // ... (existing code)
+
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-4xl mx-auto p-4 gap-6">
-      <div className="relative w-full aspect-[4/3] bg-black/5 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10 dark:ring-white/10">
-        <Image
-          src={currentPhoto.url}
-          alt={currentPhoto.metadata?.prompt || 'Photo'}
-          fill
-          className="object-contain" // Contain to see full image, or cover for aesthetics? "Photo Picker" usually implies seeing the whole photo.
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-          priority
-        />
-        {/* Helper overlay for debug/dev */}
-        <div className="absolute top-4 left-4 bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+    <div className="flex flex-col items-center justify-center w-full max-w-5xl mx-auto gap-6 px-4">
+      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] bg-gray-100 dark:bg-zinc-800 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10 flex items-center justify-center group">
+
+        {/* Background Blur for Ambience */}
+        {currentPhoto && !imgError && (
+          <div className="absolute inset-0 z-0">
+            <Image
+              src={currentPhoto.url}
+              alt=""
+              fill
+              className="object-cover blur-3xl opacity-50 scale-110"
+              unoptimized
+            />
+            <div className="absolute inset-0 bg-white/30 dark:bg-black/30 backdrop-blur-md" />
+          </div>
+        )}
+
+        {imgError ? (
+          <div className="relative z-10 flex flex-col items-center gap-3 text-red-500 p-8 text-center bg-white/80 dark:bg-zinc-900/80 rounded-xl backdrop-blur-sm shadow-sm border border-red-100 dark:border-red-900/30">
+            <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900 dark:text-gray-100">Failed to load image</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-xs truncate">{currentPhoto.url}</p>
+            </div>
+            <button
+              onClick={() => handleNext()}
+              className="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Skip to next photo
+            </button>
+          </div>
+        ) : (
+          <div className="relative z-10 w-full h-full p-4 transition-all duration-500 ease-in-out">
+            <Image
+              src={currentPhoto.url}
+              alt={currentPhoto.metadata?.prompt || 'Photo'}
+              fill
+              className={`object-contain transition-opacity duration-500 ${loading ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+              priority
+              onError={() => setImgError(true)}
+            />
+          </div>
+        )}
+
+        {/* Info Overlay */}
+        <div className="absolute top-4 left-4 bg-black/60 text-white text-xs font-mono px-3 py-1.5 rounded-full backdrop-blur-md z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
           {currentIndex + 1} / {photos.length}
         </div>
       </div>

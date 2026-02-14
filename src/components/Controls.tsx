@@ -1,16 +1,17 @@
 import { ButtonHTMLAttributes } from 'react';
+import { ThumbsUp, ThumbsDown, SkipForward, Heart, ArrowRight } from 'lucide-react';
 
 interface ControlButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
 }
 
 function ControlButton({ variant = 'primary', className, ...props }: ControlButtonProps) {
-  const baseStyles = 'px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center gap-2';
+  const baseStyles = 'px-4 py-2 rounded-full font-medium transition-all duration-200 flex items-center justify-center gap-2 hover:scale-105 active:scale-95';
   const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-md',
-    secondary: 'bg-white text-gray-800 hover:bg-gray-100 border border-gray-200 shadow-sm dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 dark:hover:bg-zinc-700',
-    ghost: 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-zinc-800',
-    danger: 'bg-red-500 text-white hover:bg-red-600 active:bg-red-700 shadow-md',
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30',
+    secondary: 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-md dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 dark:hover:bg-zinc-700',
+    ghost: 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-white',
+    danger: 'bg-red-500 text-white hover:bg-red-600 shadow-lg hover:shadow-red-500/30',
   };
 
   return (
@@ -39,21 +40,29 @@ export default function Controls({
   disabled
 }: ControlsProps) {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-4 p-4">
-      <ControlButton onClick={onDislike} variant="secondary" disabled={disabled} title="Dislike">
-        👎
+    <div className="flex items-center justify-center gap-6 p-6 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 dark:border-zinc-800/50">
+      <ControlButton onClick={onDislike} variant="secondary" disabled={disabled} title="Dislike" className="w-12 h-12 !px-0">
+        <ThumbsDown className="w-5 h-5" />
       </ControlButton>
+
       <ControlButton onClick={onSkip} variant="ghost" disabled={disabled} title="Skip">
-        Skip
+        <SkipForward className="w-5 h-5" />
+        <span className="text-sm font-medium">Skip</span>
       </ControlButton>
-      <ControlButton onClick={onLike} variant="secondary" disabled={disabled} title="Like">
-        👍
+
+      <ControlButton onClick={onLike} variant="secondary" disabled={disabled} title="Like" className="w-14 h-14 !px-0 text-green-600 dark:text-green-400">
+        <ThumbsUp className="w-6 h-6 fill-current" />
       </ControlButton>
-      <ControlButton onClick={onFavorite} variant="secondary" disabled={disabled} title="Favorite">
-        ❤️
+
+      <ControlButton onClick={onFavorite} variant="secondary" disabled={disabled} title="Favorite" className="w-12 h-12 !px-0 text-red-500">
+        <Heart className="w-5 h-5" />
       </ControlButton>
+
+      <div className="h-8 w-px bg-gray-200 dark:bg-zinc-700 mx-2" />
+
       <ControlButton onClick={onNext} variant="primary" disabled={disabled} title="Next Photo">
-        Next ➡
+        <span>Next</span>
+        <ArrowRight className="w-4 h-4" />
       </ControlButton>
     </div>
   );

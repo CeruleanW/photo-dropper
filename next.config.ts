@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
         hostname: '*.googleusercontent.com',
       },
       {
+        protocol: 'https',
+        hostname: '*.google.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.ggpht.com',
+      },
+      {
          protocol: 'https',
          hostname: '*.picsum.photos',
       },
@@ -15,7 +23,6 @@ const nextConfig: NextConfig = {
          protocol: 'https',
          hostname: 'picsum.photos',
       },
-       // Add specific photo domains if needed
     ],
   },
 };

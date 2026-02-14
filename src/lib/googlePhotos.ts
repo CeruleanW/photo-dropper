@@ -1,6 +1,7 @@
 import Account from "@/models/Account";
 import Photo from "@/models/Photo";
 import connectToDatabase from "./db";
+import { downloadImage } from '@/lib/storage';
 
 const GOOGLE_PICKER_API_BASE = 'https://photospicker.googleapis.com/v1';
 
@@ -54,6 +55,22 @@ async function getGoogleAccessToken(userId: string): Promise<string> {
     return data.access_token;
 }
 
+export function calculateDimensions(originalWidth: number, originalHeight: number, maxDimension: number): { width: number, height: number } {
+    let width = originalWidth;
+    let height = originalHeight;
+
+    if (originalWidth > maxDimension || originalHeight > maxDimension) {
+        if (originalWidth > originalHeight) {
+            width = maxDimension;
+            height = Math.round((originalHeight / originalWidth) * maxDimension);
+        } else {
+            height = maxDimension;
+            width = Math.round((originalWidth / originalHeight) * maxDimension);
+        }
+    }
+    return { width, height };
+}
+
 export async function createPickerSession(userId: string) {
     const accessToken = await getGoogleAccessToken(userId);
 
@@ -99,9 +116,13 @@ export async function listPickedMediaItems(userId: string, sessionId: string) {
     const accessToken = await getGoogleAccessToken(userId);
     let pageToken = '';
     let totalSynced = 0;
+    const errors: string[] = [];
 
+    // Use Picker API to list items from the session
+    
     // Loop incase there are multiple pages
     do {
+        // ... (existing URL construction)
         const url = new URL(`${GOOGLE_PICKER_API_BASE}/mediaItems`);
         url.searchParams.append('sessionId', sessionId);
         url.searchParams.append('pageSize', '100');
@@ -123,107 +144,75 @@ export async function listPickedMediaItems(userId: string, sessionId: string) {
 
         const data = await response.json();
         const mediaItems = data.mediaItems || [];
+        console.log(`[listPickedMediaItems] API returned ${mediaItems.length} items. PageToken: ${!!data.nextPageToken}`);
 
         if (mediaItems.length > 0) {
-            // Upsert into DB
-            await connectToDatabase(); // ensure db connected for bulkWrite
-            const ops = mediaItems
-                .filter((item: any) => item.mediaFile && item.mediaFile.baseUrl)
-                .map((item: any) => ({
-                    updateOne: {
-                        filter: { externalId: item.id }, // Use item.id as externalId
-                        update: {
-                            $set: {
-                                userId,
-                                externalId: item.id,
-                                source: 'GOOGLE',
-                                url: item.mediaFile.baseUrl,
-                                // Note on BaseURL: It might expire. 
-                                // Ideally we download bytes, but for now we store the URL.
-                                // We store logic dimensions to help UI
-                                metadata: {
-                                    width: item.mediaFile.mediaWidth,
-                                    height: item.mediaFile.mediaHeight,
-                                    mimeType: item.mediaFile.mimeType,
-                                    filename: item.mediaFile.filename,
-                                },
-                            }
-                        },
-                        upsert: true
+            await connectToDatabase(); 
+            
+            // Process items one by one
+            const ops = [];
+            for (const item of mediaItems) {
+                if (!item.mediaFile || !item.mediaFile.baseUrl) {
+                    console.warn(`[listPickedMediaItems] Skipping item ${item.id} due to missing mediaFile or baseUrl`, item);
+                    errors.push(`Item ${item.id} missing URL`);
+                    continue;
+                }
+                
+                try {
+                    // Download full res image
+                    const MAX_DIMENSION = 2048;
+// ... (imports)
+                    const originalWidth = parseInt(item.mediaFile.mediaWidth);
+                    const originalHeight = parseInt(item.mediaFile.mediaHeight);
+                    
+                    let downloadUrl = item.mediaFile.baseUrl;
+                    let width = 0;
+                    let height = 0;
+
+                    if (!isNaN(originalWidth) && !isNaN(originalHeight)) {
+                        const dims = calculateDimensions(originalWidth, originalHeight, MAX_DIMENSION);
+                        width = dims.width;
+                        height = dims.height;
+                        downloadUrl = `${item.mediaFile.baseUrl}=w${width}-h${height}`;
+                    } else {
+                        console.warn(`[listPickedMediaItems] Item ${item.id} has invalid dimensions: ${item.mediaFile.mediaWidth}x${item.mediaFile.mediaHeight}. Appending =d to enforce download.`);
+                        // Try =d which is standard for "download"
+                         downloadUrl = `${item.mediaFile.baseUrl}=d`;
                     }
-                }));
-
-            if (ops.length > 0) {
-                await Photo.bulkWrite(ops);
-                totalSynced += ops.length;
-            }
-        }
-
-        pageToken = data.nextPageToken;
-    } while (pageToken);
-
-    return totalSynced;
-}
-
-export async function syncGooglePhotos(userId: string) {
-    const accessToken = await getGoogleAccessToken(userId);
-    let pageToken = '';
-    let totalSynced = 0;
-
-    // Use Library API to list items
-    const GOOGLE_PHOTOS_API_BASE = 'https://photoslibrary.googleapis.com/v1';
-
-    do {
-        const url = new URL(`${GOOGLE_PHOTOS_API_BASE}/mediaItems`);
-        url.searchParams.append('pageSize', '50');
-        if (pageToken) {
-            url.searchParams.append('pageToken', pageToken);
-        }
-
-        const response = await fetch(url.toString(), {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-type': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            console.error('List library items error:', errorBody);
-            throw new Error(`Failed to list library items: ${response.status} ${errorBody}`);
-        }
-
-        const data = await response.json();
-        const mediaItems = data.mediaItems || [];
-
-        if (mediaItems.length > 0) {
-             await connectToDatabase();
-             const ops = mediaItems
-                .filter((item: any) => item.mimeType?.startsWith('image/'))
-                .map((item: any) => ({
-                    updateOne: {
-                        filter: { externalId: item.id },
-                        update: {
-                            $set: {
-                                userId, // Assuming Photo model has userId, or we add it (it should for multi-user)
-                                source: 'GOOGLE' as const,
-                                url: `${item.baseUrl}=w${item.mediaMetadata.width}-h${item.mediaMetadata.height}`,
-                                thumbnailUrl: `${item.baseUrl}=w400-h400`,
-                                metadata: {
-                                    width: item.mediaMetadata.width,
-                                    height: item.mediaMetadata.height,
-                                    creationTime: item.mediaMetadata.creationTime,
-                                    filename: item.filename,
-                                    id: item.id
+                    const filename = `${item.id}.jpg`;
+                    
+                    const localPath = await downloadImage(downloadUrl, filename, accessToken);
+                    
+                    ops.push({
+                        updateOne: {
+                            filter: { externalId: item.id },
+                            update: {
+                                $set: {
+                                    userId,
+                                    externalId: item.id,
+                                    source: 'GOOGLE' as const,
+                                    url: localPath,
+                                    metadata: {
+                                        originalUrl: item.mediaFile.baseUrl,
+                                        width,
+                                        height,
+                                        mimeType: item.mediaFile.mimeType,
+                                        filename: item.mediaFile.filename,
+                                    },
+                                    updatedAt: new Date(),
+                                },
+                                $setOnInsert: {
+                                    displayCount: 0,
                                 }
                             },
-                            $setOnInsert: {
-                                displayCount: 0,
-                            }
-                        },
-                        upsert: true
-                    }
-                }));
+                            upsert: true
+                        }
+                    });
+                } catch (err) {
+                    console.error(`Failed to download item ${item.id}`, err);
+                    errors.push(`Failed to download ${item.id}: ${err instanceof Error ? err.message : String(err)}`);
+                }
+            }
 
             if (ops.length > 0) {
                 await Photo.bulkWrite(ops);
@@ -232,10 +221,7 @@ export async function syncGooglePhotos(userId: string) {
         }
 
         pageToken = data.nextPageToken;
-        // Limit to 100 items for now to avoid long syncs in this demo
-        if (totalSynced >= 100) break;
-
     } while (pageToken);
 
-    return totalSynced;
+    return { count: totalSynced, errors };
 }
