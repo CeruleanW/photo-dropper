@@ -29,6 +29,8 @@ interface ControlsProps {
   onFavorite: () => void;
   onNext: () => void;
   disabled?: boolean;
+  isLiked?: boolean;
+  isFavorited?: boolean;
 }
 
 export default function Controls({
@@ -37,7 +39,9 @@ export default function Controls({
   onSkip,
   onFavorite,
   onNext,
-  disabled
+  disabled,
+  isLiked = false,
+  isFavorited = false,
 }: ControlsProps) {
   return (
     <div className="flex items-center justify-center gap-6 p-6 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-2xl shadow-xl border border-white/20 dark:border-zinc-800/50">
@@ -50,12 +54,12 @@ export default function Controls({
         <span className="text-sm font-medium">Skip</span>
       </ControlButton>
 
-      <ControlButton onClick={onLike} variant="secondary" disabled={disabled} title="Like" className="w-14 h-14 !px-0 text-green-600 dark:text-green-400">
-        <ThumbsUp className="w-6 h-6 fill-current" />
+      <ControlButton onClick={onLike} variant="secondary" disabled={disabled} title="Like" className={`w-14 h-14 !px-0 ${isLiked ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700' : 'text-gray-500 dark:text-gray-400'}`}>
+        <ThumbsUp className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
       </ControlButton>
 
-      <ControlButton onClick={onFavorite} variant="secondary" disabled={disabled} title="Favorite" className="w-12 h-12 !px-0 text-red-500">
-        <Heart className="w-5 h-5" />
+      <ControlButton onClick={onFavorite} variant="secondary" disabled={disabled} title="Favorite" className={`w-12 h-12 !px-0 ${isFavorited ? 'text-red-500 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700' : 'text-gray-500 dark:text-gray-400'}`}>
+        <Heart className={`w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
       </ControlButton>
 
       <div className="h-8 w-px bg-gray-200 dark:bg-zinc-700 mx-2" />

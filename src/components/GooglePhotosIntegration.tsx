@@ -2,9 +2,13 @@
 
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useState, useRef } from 'react';
-import { Download, Trash2, LogOut, CheckCircle, AlertCircle } from 'lucide-react';
+import { Download, Trash2, LogOut } from 'lucide-react';
 
-export default function GooglePhotosIntegration() {
+interface GooglePhotosIntegrationProps {
+  onImportSuccess?: () => void;
+}
+
+export default function GooglePhotosIntegration({ onImportSuccess }: GooglePhotosIntegrationProps) {
   const { data: session } = useSession();
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState('');
@@ -33,6 +37,10 @@ export default function GooglePhotosIntegration() {
             }
           }
           setMessage(msg);
+
+          if (data.count > 0 && onImportSuccess) {
+            onImportSuccess(); // Trigger parent refresh
+          }
 
           // Helper to close window if it's still open
           if (pickerWindow && !pickerWindow.closed) {

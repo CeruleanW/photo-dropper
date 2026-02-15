@@ -6,51 +6,102 @@ import Controls from './Controls';
 import MetadataEditor from './MetadataEditor';
 import { Photo } from '@/types';
 
-export default function PhotoViewer() {
+// ... imports
+
+interface PhotoViewerProps {
+  searchQuery?: string;
+  refreshTrigger?: number; // Add Prop
+}
+
+export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewerProps) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [likedPhotos, setLikedPhotos] = useState<Set<string>>(new Set());
+  const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set());
+
+  const currentPhoto = photos[currentIndex];
 
   // Reset image error when photo changes
   useEffect(() => {
     setImgError(false);
   }, [currentIndex]);
 
+  // Listen for refresh trigger
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      setPhotos([]); // Clear to show loading
+      setCurrentIndex(0);
+      // fetchPhotos will be called by the next useEffect/logic because photos is empty? 
+      // No, current logic is "if photos.length === 0 { fetch() }" in a distinct useEffect.
+      // Let's rely on that existing effect. By setting photos to [], it should trigger it.
+    }
+  }, [refreshTrigger]);
+
+  // Reset photos when searchQuery changes
+  useEffect(() => {
+    setPhotos([]);
+    setCurrentIndex(0);
+  }, [searchQuery]);
+
   const fetchPhotos = useCallback(async (count = 10) => {
+    // ... (fetch logic remains same)
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/photos/next?count=${count}`);
+      let url = `/api/photos/next?count=${count}`;
+      if (searchQuery) {
+        url = `/api/photos/search?q=${encodeURIComponent(searchQuery)}&limit=${count}`;
+      }
+
+      const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch photos');
       const data = await res.json();
 
-      // Filter out duplicates if needed, or just append
-      // For now, replacing the list if empty, or appending if near end?
-      // Simple strategy: If list is empty, set it. If appending, add to end.
       setPhotos(prev => {
-        // Simple distinct check by ID
+        if ((searchQuery || (refreshTrigger && refreshTrigger > 0)) && prev.length === 0) {
+          return data.photos;
+        }
+        // ... (standard append logic)
         const existingIds = new Set(prev.map(p => p._id));
         const newPhotos = data.photos.filter((p: Photo) => !existingIds.has(p._id));
         return [...prev, ...newPhotos];
+      });
+
+      // Seed like/favorite state from persisted data
+      const fetchedPhotos = data.photos as Photo[];
+      setLikedPhotos(prev => {
+        const next = new Set(prev);
+        fetchedPhotos.forEach((p: Photo) => {
+          if (p.isLiked) next.add(p._id);
+        });
+        return next;
+      });
+      setFavoritedPhotos(prev => {
+        const next = new Set(prev);
+        fetchedPhotos.forEach((p: Photo) => {
+          if (p.isFavorited) next.add(p._id);
+        });
+        return next;
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchQuery, refreshTrigger]);
 
-  // Initial fetch
-  useEffect(() => {
-    // Only fetch if we have no photos
-    if (photos.length === 0) {
-      fetchPhotos();
-    }
-  }, [fetchPhotos, photos.length]);
+  // Initial fetch logic...
+  // ...
 
-  const currentPhoto = photos[currentIndex];
+
+
+
+  // ... rest of component
+
+  // ... rest of component
 
   const handleNext = () => {
     if (currentIndex < photos.length - 1) {
@@ -88,6 +139,30 @@ export default function PhotoViewer() {
       console.error('Failed to record interaction', err);
     }
 
+    // Toggle like/favorite state
+    if (type === 'LIKE') {
+      setLikedPhotos(prev => {
+        const next = new Set(prev);
+        if (next.has(currentPhoto._id)) {
+          next.delete(currentPhoto._id);
+        } else {
+          next.add(currentPhoto._id);
+        }
+        return next;
+      });
+    }
+    if (type === 'FAVORITE') {
+      setFavoritedPhotos(prev => {
+        const next = new Set(prev);
+        if (next.has(currentPhoto._id)) {
+          next.delete(currentPhoto._id);
+        } else {
+          next.add(currentPhoto._id);
+        }
+        return next;
+      });
+    }
+
     // Move to next photo automatically on some actions
     if (type === 'SKIP' || type === 'DISLIKE') {
       handleNext();
@@ -119,19 +194,25 @@ export default function PhotoViewer() {
 
   if (!currentPhoto) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
+      <div className="flex flex-col items-center justify-center h-96 gap-4 text-center">
         {loading ? (
-          <p className="text-lg animate-pulse">Loading photos...</p>
+          <p className="text-lg animate-pulse text-gray-500">Loading photos...</p>
         ) : (
-          <div className="text-center">
-            <p className="text-lg text-gray-500 mb-4">No photos found.</p>
+          <>
+            <div className="p-4 bg-gray-100 dark:bg-zinc-800 rounded-full mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+            </div>
+            <p className="text-lg text-gray-500 dark:text-gray-400">No photos found.</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs">
+              {searchQuery ? `No matches for "${searchQuery}"` : "Try importing photos from Google or check back later."}
+            </p>
             <button
-              onClick={() => fetch('/api/seed', { method: 'POST' }).then(() => fetchPhotos())}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition"
+              onClick={() => fetchPhotos()}
+              className="mt-2 px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition flex items-center gap-2"
             >
-              Seed Database with Sample Photos
+              Next
             </button>
-          </div>
+          </>
         )}
       </div>
     );
@@ -177,15 +258,35 @@ export default function PhotoViewer() {
           </div>
         ) : (
           <div className="relative z-10 w-full h-full p-4 transition-all duration-500 ease-in-out">
-            <Image
-              src={currentPhoto.url}
-              alt={currentPhoto.metadata?.prompt || 'Photo'}
-              fill
-              className={`object-contain transition-opacity duration-500 ${loading ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-              priority
-              onError={() => setImgError(true)}
-            />
+            {currentPhoto.metadata?.productUrl ? (
+              <a
+                href={currentPhoto.metadata.productUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full h-full relative cursor-pointer"
+                title="Open in Google Photos"
+              >
+                <Image
+                  src={currentPhoto.url}
+                  alt={currentPhoto.metadata?.prompt || 'Photo'}
+                  fill
+                  className={`object-contain transition-opacity duration-500 ${loading ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+                  priority
+                  onError={() => setImgError(true)}
+                />
+              </a>
+            ) : (
+              <Image
+                src={currentPhoto.url}
+                alt={currentPhoto.metadata?.prompt || 'Photo'}
+                fill
+                className={`object-contain transition-opacity duration-500 ${loading ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+                priority
+                onError={() => setImgError(true)}
+              />
+            )}
           </div>
         )}
 
@@ -202,6 +303,8 @@ export default function PhotoViewer() {
         onFavorite={() => handleInteraction('FAVORITE')}
         onNext={handleNext}
         disabled={loading && photos.length === 0}
+        isLiked={currentPhoto ? likedPhotos.has(currentPhoto._id) : false}
+        isFavorited={currentPhoto ? favoritedPhotos.has(currentPhoto._id) : false}
       />
 
       {currentPhoto && (

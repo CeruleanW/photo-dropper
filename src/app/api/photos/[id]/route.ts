@@ -42,7 +42,12 @@ export async function PATCH(
     
     const updateData: Record<string, any> = {};
     
-    if (body.tags) {
+    // Explicitly handle description and tags
+    if (typeof body.description === 'string') {
+       updateData['metadata.description'] = body.description.trim();
+    }
+    
+    if (Array.isArray(body.tags)) {
        updateData['metadata.tags'] = body.tags;
     }
     

@@ -7,6 +7,8 @@ export interface IPhoto extends Document {
   url: string;
   thumbnailUrl?: string;
   metadata: Record<string, any>;
+  isLiked: boolean;
+  isFavorited: boolean;
   lastDisplayedAt?: Date;
   displayCount: number;
   createdAt: Date;
@@ -24,7 +26,9 @@ const PhotoSchema: Schema = new Schema(
     externalId: { type: String, required: true }, // unique per user ideally, but global unique compliant
     url: { type: String, required: true }, // Main URL or storage path
     thumbnailUrl: { type: String },
-    metadata: { type: Map, of: Schema.Types.Mixed, default: {} },
+    metadata: { type: Schema.Types.Mixed, default: {} },
+    isLiked: { type: Boolean, default: false },
+    isFavorited: { type: Boolean, default: false },
     lastDisplayedAt: { type: Date },
     displayCount: { type: Number, default: 0 },
   },

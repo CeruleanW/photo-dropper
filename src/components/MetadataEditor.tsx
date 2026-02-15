@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Photo } from '@/types';
 
 interface MetadataEditorProps {
@@ -11,10 +11,33 @@ interface MetadataEditorProps {
 export default function MetadataEditor({ photo, onUpdate }: MetadataEditorProps) {
   const [tagInput, setTagInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState((photo.metadata as any)?.description || '');
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
 
   // Safely access tags from metadata
   const tags: string[] = (photo.metadata as any)?.tags || [];
+
+  // Update local state when photo prop changes
+  useEffect(() => {
+    setDescriptionInput((photo.metadata as any)?.description || '');
+  }, [photo._id, photo.metadata]);
+
+  const handleSaveDescription = async () => {
+    try {
+      const res = await fetch(`/api/photos/${photo._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: descriptionInput }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        onUpdate(data.photo);
+      }
+    } catch (error) {
+      console.error('Failed to save description', error);
+    }
+  };
 
   const handleAddTag = async () => {
     if (!tagInput.trim()) return;
@@ -71,6 +94,30 @@ export default function MetadataEditor({ photo, onUpdate }: MetadataEditorProps)
 
       {isTagsExpanded && (
         <div className="space-y-4">
+          {/* Description Section */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Description</label>
+            <div className="flex gap-2">
+              <textarea
+                value={descriptionInput}
+                onChange={(e) => setDescriptionInput(e.target.value)}
+                placeholder="Add a description..."
+                rows={3}
+                className="w-full px-3 py-2 text-sm border rounded bg-transparent dark:border-zinc-600 dark:text-white resize-none"
+              />
+            </div>
+            {descriptionInput !== (photo.metadata as any)?.description && (
+              <div className="flex justify-end mt-1">
+                <button
+                  onClick={handleSaveDescription}
+                  className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"
+                >
+                  Save Description
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Tags Section */}
           <div>
             <div className="flex flex-wrap gap-2 mb-2">

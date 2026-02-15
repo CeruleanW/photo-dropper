@@ -5,6 +5,8 @@ export interface Photo {
   url: string;
   thumbnailUrl?: string;
   metadata?: Record<string, any>;
+  isLiked?: boolean;
+  isFavorited?: boolean;
   lastDisplayedAt?: string; // Serialized date
   displayCount: number;
 }

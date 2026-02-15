@@ -198,6 +198,8 @@ export async function listPickedMediaItems(userId: string, sessionId: string) {
                                         height,
                                         mimeType: item.mediaFile.mimeType,
                                         filename: item.mediaFile.filename,
+                                        description: item.description || '', // Capture description/caption
+                                        productUrl: item.productUrl, // Link to Google Photos
                                     },
                                     updatedAt: new Date(),
                                 },

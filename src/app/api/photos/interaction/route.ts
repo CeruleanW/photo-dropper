@@ -43,6 +43,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Toggle like/favorite state on the Photo document
+    if (type === 'LIKE') {
+      const photo = await Photo.findById(photoId);
+      if (photo) {
+        await Photo.findByIdAndUpdate(photoId, {
+          $set: { isLiked: !photo.isLiked },
+        });
+      }
+    }
+
+    if (type === 'FAVORITE') {
+      const photo = await Photo.findById(photoId);
+      if (photo) {
+        await Photo.findByIdAndUpdate(photoId, {
+          $set: { isFavorited: !photo.isFavorited },
+        });
+      }
+    }
+
     return NextResponse.json({ success: true, interaction });
   } catch (error) {
     console.error('Error recording interaction:', error);
