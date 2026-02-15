@@ -1,5 +1,5 @@
 import { ButtonHTMLAttributes } from 'react';
-import { ThumbsUp, ThumbsDown, SkipForward, Heart, ArrowRight } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Heart, ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface ControlButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -25,8 +25,8 @@ function ControlButton({ variant = 'primary', className, ...props }: ControlButt
 interface ControlsProps {
   onLike: () => void;
   onDislike: () => void;
-  onSkip: () => void;
   onFavorite: () => void;
+  onPrev: () => void;
   onNext: () => void;
   disabled?: boolean;
   isLiked?: boolean;
@@ -36,8 +36,8 @@ interface ControlsProps {
 export default function Controls({
   onLike,
   onDislike,
-  onSkip,
   onFavorite,
+  onPrev,
   onNext,
   disabled,
   isLiked = false,
@@ -49,11 +49,6 @@ export default function Controls({
         <ThumbsDown className="w-5 h-5" />
       </ControlButton>
 
-      <ControlButton onClick={onSkip} variant="ghost" disabled={disabled} title="Skip">
-        <SkipForward className="w-5 h-5" />
-        <span className="text-sm font-medium">Skip</span>
-      </ControlButton>
-
       <ControlButton onClick={onLike} variant="secondary" disabled={disabled} title="Like" className={`w-14 h-14 !px-0 ${isLiked ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700' : 'text-gray-500 dark:text-gray-400'}`}>
         <ThumbsUp className={`w-6 h-6 ${isLiked ? 'fill-current' : ''}`} />
       </ControlButton>
@@ -63,6 +58,11 @@ export default function Controls({
       </ControlButton>
 
       <div className="h-8 w-px bg-gray-200 dark:bg-zinc-700 mx-2" />
+
+      <ControlButton onClick={onPrev} variant="secondary" disabled={disabled} title="Previous Photo">
+        <ArrowLeft className="w-4 h-4" />
+        <span>Prev</span>
+      </ControlButton>
 
       <ControlButton onClick={onNext} variant="primary" disabled={disabled} title="Next Photo">
         <span>Next</span>

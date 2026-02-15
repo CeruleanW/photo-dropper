@@ -45,11 +45,12 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
     setPhotos([]);
     setCurrentIndex(0);
   }, [searchQuery]);
+  const [hasMore, setHasMore] = useState(true);
 
-  const fetchPhotos = useCallback(async (count = 10) => {
-    // ... (fetch logic remains same)
+  const fetchPhotos = useCallback(async (count = 25): Promise<number> => {
     setLoading(true);
     setError(null);
+    let newCount = 0;
     try {
       let url = `/api/photos/next?count=${count}`;
       if (searchQuery) {
@@ -62,11 +63,15 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
 
       setPhotos(prev => {
         if ((searchQuery || (refreshTrigger && refreshTrigger > 0)) && prev.length === 0) {
+          newCount = data.photos.length;
           return data.photos;
         }
-        // ... (standard append logic)
         const existingIds = new Set(prev.map(p => p._id));
         const newPhotos = data.photos.filter((p: Photo) => !existingIds.has(p._id));
+        newCount = newPhotos.length;
+        if (newPhotos.length === 0) {
+          setHasMore(false);
+        }
         return [...prev, ...newPhotos];
       });
 
@@ -91,6 +96,7 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
     } finally {
       setLoading(false);
     }
+    return newCount;
   }, [searchQuery, refreshTrigger]);
 
   // Initial fetch logic...
@@ -103,12 +109,22 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
 
   // ... rest of component
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (photos.length === 0) return;
     if (currentIndex < photos.length - 1) {
       setCurrentIndex(prev => prev + 1);
+    } else if (hasMore) {
+      // Try to fetch more photos
+      const added = await fetchPhotos();
+      if (added > 0) {
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        // No new photos, wrap around
+        setCurrentIndex(0);
+      }
     } else {
-      // Reached end, fetch more
-      fetchPhotos();
+      // Already know there are no more, wrap around
+      setCurrentIndex(0);
     }
   };
 
@@ -299,8 +315,15 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
       <Controls
         onLike={() => handleInteraction('LIKE')}
         onDislike={() => handleInteraction('DISLIKE')}
-        onSkip={() => handleInteraction('SKIP')}
         onFavorite={() => handleInteraction('FAVORITE')}
+        onPrev={() => {
+          if (photos.length === 0) return;
+          if (currentIndex > 0) {
+            setCurrentIndex(prev => prev - 1);
+          } else {
+            setCurrentIndex(photos.length - 1);
+          }
+        }}
         onNext={handleNext}
         disabled={loading && photos.length === 0}
         isLiked={currentPhoto ? likedPhotos.has(currentPhoto._id) : false}
