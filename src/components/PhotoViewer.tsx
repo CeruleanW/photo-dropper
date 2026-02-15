@@ -6,7 +6,13 @@ import Controls from './Controls';
 import MetadataEditor from './MetadataEditor';
 import { Photo } from '@/types';
 
-// ... imports
+// Pixiv images need to be proxied server-side due to hotlink protection
+function getImageUrl(photo: Photo): string {
+  if (photo.source === 'PIXIV' && photo.url.includes('pximg.net')) {
+    return `/api/proxy/image?url=${encodeURIComponent(photo.url)}`;
+  }
+  return photo.url;
+}
 
 interface PhotoViewerProps {
   searchQuery?: string;
@@ -28,6 +34,31 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
   useEffect(() => {
     setImgError(false);
   }, [currentIndex]);
+
+  // Lazily resolve Pixiv high-res URL when a photo is displayed
+  useEffect(() => {
+    if (!currentPhoto) return;
+    if (currentPhoto.source !== 'PIXIV') return;
+    if (currentPhoto.metadata?.resolved) return;
+
+    // Resolve in background — thumbnail shows immediately via proxy
+    (async () => {
+      try {
+        const res = await fetch(`/api/integrations/pixiv/resolve?id=${currentPhoto._id}`);
+        const data = await res.json();
+        if (data.success && data.url) {
+          // Update the photo in state with the resolved high-res URL
+          setPhotos(prev => prev.map(p =>
+            p._id === currentPhoto._id
+              ? { ...p, url: data.url, metadata: { ...p.metadata, resolved: true } }
+              : p
+          ));
+        }
+      } catch {
+        // Thumbnail still works, silent fail
+      }
+    })();
+  }, [currentPhoto]);
 
   // Listen for refresh trigger
   useEffect(() => {
@@ -240,24 +271,10 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-5xl mx-auto gap-6 px-4">
-      <div className="relative w-full aspect-[4/3] md:aspect-[16/9] bg-gray-100 dark:bg-zinc-800 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10 flex items-center justify-center group">
-
-        {/* Background Blur for Ambience */}
-        {currentPhoto && !imgError && (
-          <div className="absolute inset-0 z-0">
-            <Image
-              src={currentPhoto.url}
-              alt=""
-              fill
-              className="object-cover blur-3xl opacity-50 scale-110"
-              unoptimized
-            />
-            <div className="absolute inset-0 bg-white/30 dark:bg-black/30 backdrop-blur-md" />
-          </div>
-        )}
+      <div className="relative w-full max-h-[80vh] bg-gray-100 dark:bg-zinc-800 rounded-2xl overflow-y-auto overflow-x-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10 group">
 
         {imgError ? (
-          <div className="relative z-10 flex flex-col items-center gap-3 text-red-500 p-8 text-center bg-white/80 dark:bg-zinc-900/80 rounded-xl backdrop-blur-sm shadow-sm border border-red-100 dark:border-red-900/30">
+          <div className="flex flex-col items-center gap-3 text-red-500 p-8 text-center bg-white/80 dark:bg-zinc-900/80 rounded-xl backdrop-blur-sm shadow-sm border border-red-100 dark:border-red-900/30 m-8">
             <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
             </div>
@@ -273,33 +290,29 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
             </button>
           </div>
         ) : (
-          <div className="relative z-10 w-full h-full p-4 transition-all duration-500 ease-in-out">
+          <div className="w-full">
             {currentPhoto.metadata?.productUrl ? (
               <a
                 href={currentPhoto.metadata.productUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full h-full relative cursor-pointer"
+                className="block w-full cursor-pointer"
                 title="Open in Google Photos"
               >
-                <Image
-                  src={currentPhoto.url}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getImageUrl(currentPhoto)}
                   alt={currentPhoto.metadata?.prompt || 'Photo'}
-                  fill
-                  className={`object-contain transition-opacity duration-500 ${loading ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-                  priority
+                  className={`w-full h-auto transition-opacity duration-500 ${loading ? 'opacity-50' : 'opacity-100'}`}
                   onError={() => setImgError(true)}
                 />
               </a>
             ) : (
-              <Image
-                src={currentPhoto.url}
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={getImageUrl(currentPhoto)}
                 alt={currentPhoto.metadata?.prompt || 'Photo'}
-                fill
-                className={`object-contain transition-opacity duration-500 ${loading ? 'opacity-50 scale-95' : 'opacity-100 scale-100'}`}
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-                priority
+                className={`w-full h-auto transition-opacity duration-500 ${loading ? 'opacity-50' : 'opacity-100'}`}
                 onError={() => setImgError(true)}
               />
             )}

@@ -1,6 +1,6 @@
 export interface Photo {
   _id: string;
-  source: 'GOOGLE' | 'ICLOUD' | 'LOCAL';
+  source: 'GOOGLE' | 'ICLOUD' | 'LOCAL' | 'PIXIV';
   externalId: string;
   url: string;
   thumbnailUrl?: string;

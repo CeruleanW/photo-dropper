@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IPhoto extends Document {
   userId: string;
-  source: 'GOOGLE' | 'ICLOUD' | 'LOCAL';
+  source: 'GOOGLE' | 'ICLOUD' | 'LOCAL' | 'PIXIV';
   externalId: string;
   url: string;
   thumbnailUrl?: string;
@@ -20,7 +20,7 @@ const PhotoSchema: Schema = new Schema(
     userId: { type: String, required: true },
     source: {
       type: String,
-      enum: ['GOOGLE', 'ICLOUD', 'LOCAL'],
+      enum: ['GOOGLE', 'ICLOUD', 'LOCAL', 'PIXIV'],
       required: true,
     },
     externalId: { type: String, required: true }, // unique per user ideally, but global unique compliant
