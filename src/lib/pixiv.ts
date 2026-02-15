@@ -71,25 +71,33 @@ async function fetchBookmarkPage(
 ): Promise<{ works: PixivWork[]; total: number }> {
   const url = `${PIXIV_BASE}/ajax/user/${pixivUserId}/illusts/bookmarks?tag=&offset=${offset}&limit=${limit}&rest=show&lang=en`;
 
-  const res = await fetch(url, {
-    headers: {
-      'Cookie': `PHPSESSID=${getSessionCookie()}`,
-      'Referer': 'https://www.pixiv.net/',
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Pixiv API error (${res.status}): ${text}`);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Cookie': `PHPSESSID=${getSessionCookie()}`,
+        'Referer': 'https://www.pixiv.net/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Pixiv API error (${res.status}): ${text}`);
+    }
+
+    const data: PixivBookmarkResponse = await res.json();
+    if (data.error) {
+      throw new Error(`Pixiv API error: ${data.message}`);
+    }
+
+    return { works: data.body.works, total: data.body.total };
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data: PixivBookmarkResponse = await res.json();
-  if (data.error) {
-    throw new Error(`Pixiv API error: ${data.message}`);
-  }
-
-  return { works: data.body.works, total: data.body.total };
 }
 
 /**
@@ -98,26 +106,34 @@ async function fetchBookmarkPage(
 async function fetchOriginalUrl(illustId: string): Promise<string> {
   const url = `${PIXIV_BASE}/ajax/illust/${illustId}/pages?lang=en`;
 
-  const res = await fetch(url, {
-    headers: {
-      'Cookie': `PHPSESSID=${getSessionCookie()}`,
-      'Referer': `https://www.pixiv.net/artworks/${illustId}`,
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
 
-  if (!res.ok) {
-    // Fall back to the thumbnail if we can't get original
-    return '';
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Cookie': `PHPSESSID=${getSessionCookie()}`,
+        'Referer': `https://www.pixiv.net/artworks/${illustId}`,
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      // Fall back to the thumbnail if we can't get original
+      return '';
+    }
+
+    const data = await res.json();
+    if (data.error || !data.body || data.body.length === 0) {
+      return '';
+    }
+
+    // First page, regular quality (original can be very large)
+    return data.body[0].urls?.regular || data.body[0].urls?.original || '';
+  } finally {
+    clearTimeout(timeout);
   }
-
-  const data = await res.json();
-  if (data.error || !data.body || data.body.length === 0) {
-    return '';
-  }
-
-  // First page, regular quality (original can be very large)
-  return data.body[0].urls?.regular || data.body[0].urls?.original || '';
 }
 
 /**

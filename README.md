@@ -24,10 +24,11 @@ The idea of this project is to create a web application that can automatically i
 
 ## Tech Stack
 
+- Pnpm
+- Node.js (version 20+)
 - Next.js
 - React
 - TypeScript
 - Tailwind CSS
 - MongoDB
 - Google Photos API
-- iCloud API

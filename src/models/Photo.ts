@@ -37,6 +37,10 @@ const PhotoSchema: Schema = new Schema(
 
 // Index for efficient querying of next photo based on display history
 PhotoSchema.index({ lastDisplayedAt: 1, displayCount: 1 });
+// Compound index for deduplication lookups during import
+PhotoSchema.index({ source: 1, externalId: 1, userId: 1 });
+// Index for user-scoped queries (e.g. clearing photos by source)
+PhotoSchema.index({ userId: 1, source: 1 });
 
 const Photo: Model<IPhoto> =
   mongoose.models.Photo || mongoose.model<IPhoto>('Photo', PhotoSchema);

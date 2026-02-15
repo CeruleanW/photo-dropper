@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Photo, { IPhoto } from '@/models/Photo';
 
+/** Escape special regex characters so user input is treated as a literal string. */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * GET /api/photos/next?count=N&search=query
  *
@@ -23,7 +28,8 @@ export async function GET(req: NextRequest) {
     // Build query filter
     const filter: Record<string, unknown> = {};
     if (search) {
-      const regex = { $regex: search, $options: 'i' };
+      const safeSearch = search.slice(0, 200);
+      const regex = { $regex: escapeRegex(safeSearch), $options: 'i' };
       filter.$or = [
         { 'metadata.description': regex },
         { 'metadata.title': regex },

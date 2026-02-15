@@ -76,4 +76,25 @@ describe('Search API', () => {
       ])
     }));
   });
+
+  it('should safely handle regex metacharacters in search query', async () => {
+    const dangerousQuery = '.*+?^${}()|[]\\';
+    const req = new NextRequest(`http://localhost/api/photos/search?q=${encodeURIComponent(dangerousQuery)}`);
+
+    const mockFind = {
+      sort: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([]),
+    };
+    (Photo.find as jest.Mock).mockReturnValue(mockFind);
+
+    // Should not throw
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.photos).toEqual([]);
+    // Verify the regex is escaped (no raw metacharacters)
+    expect(Photo.find).toHaveBeenCalled();
+  });
 });

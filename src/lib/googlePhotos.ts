@@ -24,16 +24,25 @@ async function getGoogleAccessToken(userId: string): Promise<string> {
         throw new Error('No refresh token available');
     }
 
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            client_id: process.env.GOOGLE_CLIENT_ID!,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-            grant_type: 'refresh_token',
-            refresh_token: account.refresh_token,
-        }),
-    });
+    const controller = new AbortController();
+    const refreshTimeout = setTimeout(() => controller.abort(), 15_000);
+
+    let response: Response;
+    try {
+        response = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: process.env.GOOGLE_CLIENT_ID!,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+                grant_type: 'refresh_token',
+                refresh_token: account.refresh_token,
+            }),
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(refreshTimeout);
+    }
 
     const data = await response.json();
     if (!response.ok) {
@@ -74,16 +83,23 @@ export function calculateDimensions(originalWidth: number, originalHeight: numbe
 export async function createPickerSession(userId: string) {
     const accessToken = await getGoogleAccessToken(userId);
 
-    const response = await fetch(`${GOOGLE_PICKER_API_BASE}/sessions`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            // polls config can be set here if needed
-        })
-    });
+    const controller = new AbortController();
+    const pickerTimeout = setTimeout(() => controller.abort(), 15_000);
+
+    let response: Response;
+    try {
+        response = await fetch(`${GOOGLE_PICKER_API_BASE}/sessions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({}),
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(pickerTimeout);
+    }
 
     if (!response.ok) {
         const errorBody = await response.text();
@@ -97,11 +113,20 @@ export async function createPickerSession(userId: string) {
 export async function getPickerSession(userId: string, sessionId: string) {
     const accessToken = await getGoogleAccessToken(userId);
 
-    const response = await fetch(`${GOOGLE_PICKER_API_BASE}/sessions/${sessionId}`, {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-        },
-    });
+    const controller = new AbortController();
+    const getTimeout = setTimeout(() => controller.abort(), 15_000);
+
+    let response: Response;
+    try {
+        response = await fetch(`${GOOGLE_PICKER_API_BASE}/sessions/${sessionId}`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+            },
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(getTimeout);
+    }
 
     if (!response.ok) {
         const errorBody = await response.text();
@@ -130,11 +155,20 @@ export async function listPickedMediaItems(userId: string, sessionId: string) {
             url.searchParams.append('pageToken', pageToken);
         }
 
-        const response = await fetch(url.toString(), {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-            },
-        });
+        const listController = new AbortController();
+        const listTimeout = setTimeout(() => listController.abort(), 15_000);
+
+        let response: Response;
+        try {
+            response = await fetch(url.toString(), {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                signal: listController.signal,
+            });
+        } finally {
+            clearTimeout(listTimeout);
+        }
 
         if (!response.ok) {
             const errorBody = await response.text();

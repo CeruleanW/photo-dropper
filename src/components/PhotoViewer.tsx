@@ -77,6 +77,7 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
   useEffect(() => {
     setPhotos([]);
     setCurrentIndex(0);
+    setHasMore(true);
   }, [searchQuery]);
   const [hasMore, setHasMore] = useState(true);
 
@@ -132,8 +133,12 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
     return newCount;
   }, [searchQuery, refreshTrigger]);
 
-  // Initial fetch logic...
-  // ...
+  // Initial fetch when photos array is empty
+  useEffect(() => {
+    if (photos.length === 0 && !loading && !error) {
+      fetchPhotos();
+    }
+  }, [photos.length, loading, error, fetchPhotos]);
 
 
 
@@ -337,6 +342,24 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
         <div className="absolute top-4 left-4 bg-black/60 text-white text-xs font-mono px-3 py-1.5 rounded-full backdrop-blur-md z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
           {currentIndex + 1} / {photos.length}
         </div>
+
+        {/* Open original link */}
+        {currentPhoto.metadata?.pixivUrl && (
+          <a
+            href={currentPhoto.metadata.pixivUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-md z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
+            title="Open on Pixiv"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            Pixiv
+          </a>
+        )}
       </div>
 
       <Controls

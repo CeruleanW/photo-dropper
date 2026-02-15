@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Download, Trash2, LogOut } from 'lucide-react';
 
 interface GooglePhotosIntegrationProps {
@@ -14,6 +14,13 @@ export default function GooglePhotosIntegration({ onImportSuccess }: GooglePhoto
   const [message, setMessage] = useState('');
   const [pickerWindow, setPickerWindow] = useState<Window | null>(null);
   const pollTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
+  }, []);
 
   const startPolling = (sessionId: string) => {
     if (pollTimer.current) clearInterval(pollTimer.current);

@@ -1,9 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { pipeline } from 'stream';
-import { promisify } from 'util';
-
-const streamPipeline = promisify(pipeline);
 
 export async function downloadImage(url: string, filename: string, accessToken?: string): Promise<string> {
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
@@ -19,17 +15,22 @@ export async function downloadImage(url: string, filename: string, accessToken?:
         headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
-    const response = await fetch(url, { headers });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+
+    let response: Response;
+    try {
+        response = await fetch(url, { headers, signal: controller.signal });
+    } finally {
+        clearTimeout(timeout);
+    }
+
     if (!response.ok) {
         throw new Error(`Failed to fetch image from ${url}: ${response.status} ${response.statusText}`);
     }
 
-    if (!response.body) {
-        throw new Error('No response body');
-    }
-
-    // @ts-expect-error - node-fetch vs web fetch types mismatch, but pipeline works with web streams in node 18+
-    await streamPipeline(response.body, fs.createWriteStream(filepath));
+    const buffer = await response.arrayBuffer();
+    fs.writeFileSync(filepath, Buffer.from(buffer));
 
     // Return the public URL path
     return `/uploads/${filename}`;

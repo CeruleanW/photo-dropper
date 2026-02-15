@@ -25,6 +25,9 @@ export async function POST(req: NextRequest) {
 
     const result = await importBookmarks(userId, String(pixivUserId));
 
+    // Ensure DB connection for cleanup query
+    await connectToDatabase();
+
     // Clean up any previously imported restricted/placeholder entries
     await Photo.deleteMany({
       source: 'PIXIV',
