@@ -7,9 +7,16 @@ import MetadataEditor from './MetadataEditor';
 import { Photo } from '@/types';
 
 // Pixiv images need to be proxied server-side due to hotlink protection
+function getProxiedPixivUrl(url: string): string {
+  if (url.includes('pximg.net')) {
+    return `/api/proxy/image?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 function getImageUrl(photo: Photo): string {
-  if (photo.source === 'PIXIV' && photo.url.includes('pximg.net')) {
-    return `/api/proxy/image?url=${encodeURIComponent(photo.url)}`;
+  if (photo.source === 'PIXIV') {
+    return getProxiedPixivUrl(photo.url);
   }
   return photo.url;
 }
@@ -49,10 +56,18 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
         const res = await fetch(`/api/integrations/pixiv/resolve?id=${currentPhoto._id}`);
         const data = await res.json();
         if (data.success && data.url) {
-          // Update the photo in state with the resolved high-res URL
+          // Update the photo in state with the resolved high-res URL and pages
           setPhotos(prev => prev.map(p =>
             p._id === currentPhoto._id
-              ? { ...p, url: data.url, metadata: { ...p.metadata, resolved: true } }
+              ? {
+                ...p,
+                url: data.url,
+                metadata: {
+                  ...p.metadata,
+                  resolved: true,
+                  ...(data.pages ? { pages: data.pages } : {}),
+                },
+              }
               : p
           ));
         }
@@ -308,7 +323,20 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
           </div>
         ) : (
           <div className="w-full">
-            {currentPhoto.metadata?.productUrl ? (
+            {/* Multi-page Pixiv artwork: render all pages vertically */}
+            {currentPhoto.source === 'PIXIV' && currentPhoto.metadata?.pages?.length > 1 ? (
+              currentPhoto.metadata!.pages.map((pageUrl: string, idx: number) => (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  key={idx}
+                  src={getProxiedPixivUrl(pageUrl)}
+                  alt={`${currentPhoto.metadata?.title || 'Artwork'} — page ${idx + 1}`}
+                  className={`w-full h-auto transition-opacity duration-500 ${imgLoading && idx === 0 ? 'opacity-0' : 'opacity-100'}`}
+                  onLoad={() => { if (idx === 0) setImgLoading(false); }}
+                  onError={() => { if (idx === 0) { setImgError(true); setImgLoading(false); } }}
+                />
+              ))
+            ) : currentPhoto.metadata?.productUrl ? (
               <a
                 href={currentPhoto.metadata.productUrl}
                 target="_blank"
@@ -339,8 +367,15 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
         )}
 
         {/* Info Overlay */}
-        <div className="absolute top-4 left-4 bg-black/60 text-white text-xs font-mono px-3 py-1.5 rounded-full backdrop-blur-md z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-          {currentIndex + 1} / {photos.length}
+        <div className="absolute top-4 left-4 flex items-center gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+          <div className="bg-black/60 text-white text-xs font-mono px-3 py-1.5 rounded-full backdrop-blur-md">
+            {currentIndex + 1} / {photos.length}
+          </div>
+          {currentPhoto.source === 'PIXIV' && currentPhoto.metadata?.pages?.length > 1 && (
+            <div className="bg-pink-600/80 text-white text-xs font-medium px-2.5 py-1.5 rounded-full backdrop-blur-md">
+              {currentPhoto.metadata!.pages.length} pages
+            </div>
+          )}
         </div>
 
         {/* Open original link */}

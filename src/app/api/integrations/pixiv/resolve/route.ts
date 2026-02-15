@@ -49,22 +49,31 @@ export async function GET(req: NextRequest) {
     const pagesRes = await fetch(`${PIXIV_BASE}/ajax/illust/${illustId}/pages?lang=en`, { headers });
 
     let imageUrl = photo.url; // keep thumbnail as fallback
+    let pages: string[] = [];
 
     if (pagesRes.ok) {
       const pagesData = await pagesRes.json();
       if (!pagesData.error && pagesData.body?.length > 0) {
-        imageUrl = pagesData.body[0].urls?.regular
-          || pagesData.body[0].urls?.original
-          || imageUrl;
+        // Extract all page URLs (regular quality preferred, fall back to original)
+        pages = pagesData.body
+          .map((p: { urls?: { regular?: string; original?: string } }) =>
+            p.urls?.regular || p.urls?.original || ''
+          )
+          .filter(Boolean);
+        imageUrl = pages[0] || imageUrl;
       }
     }
 
-    // Update the photo record with the resolved URL
+    // Update the photo record with the resolved URL and all pages
     photo.url = imageUrl;
-    photo.metadata = { ...photo.metadata, resolved: true };
+    photo.metadata = {
+      ...photo.metadata,
+      resolved: true,
+      ...(pages.length > 1 ? { pages } : {}),
+    };
     await photo.save();
 
-    return NextResponse.json({ success: true, url: imageUrl });
+    return NextResponse.json({ success: true, url: imageUrl, pages: pages.length > 1 ? pages : undefined });
   } catch (error) {
     console.error('Resolve error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';

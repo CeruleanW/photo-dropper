@@ -72,10 +72,16 @@ export async function POST(req: NextRequest) {
       headers: { ...makeHeaders(), Referer: `${PIXIV_BASE}/artworks/${illustId}` },
     });
     let imageUrl = illust.urls?.regular || illust.urls?.original || '';
+    let pages: string[] = [];
     if (pagesRes.ok) {
       const pagesData = await pagesRes.json();
       if (!pagesData.error && pagesData.body?.length > 0) {
-        imageUrl = pagesData.body[0].urls?.regular || pagesData.body[0].urls?.original || imageUrl;
+        pages = pagesData.body
+          .map((p: { urls?: { regular?: string; original?: string } }) =>
+            p.urls?.regular || p.urls?.original || ''
+          )
+          .filter(Boolean);
+        imageUrl = pages[0] || imageUrl;
       }
     }
 
@@ -96,6 +102,8 @@ export async function POST(req: NextRequest) {
         createDate: illust.createDate,
         pageCount: illust.pageCount,
         description: illust.description,
+        resolved: true, // Already resolved since we fetched pages
+        ...(pages.length > 1 ? { pages } : {}),
       },
     });
 
