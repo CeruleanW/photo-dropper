@@ -14,7 +14,7 @@ function getSessionCookie(): string {
 
 const HEADERS = {
   'Cookie': '',
-  'Referer': 'https://www.pixiv.net/',
+  'Referer': PIXIV_BASE,
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
 };
 
