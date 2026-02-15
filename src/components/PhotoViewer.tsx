@@ -25,14 +25,16 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [imgLoading, setImgLoading] = useState(true);
   const [likedPhotos, setLikedPhotos] = useState<Set<string>>(new Set());
   const [favoritedPhotos, setFavoritedPhotos] = useState<Set<string>>(new Set());
 
   const currentPhoto = photos[currentIndex];
 
-  // Reset image error when photo changes
+  // Reset image states when photo changes
   useEffect(() => {
     setImgError(false);
+    setImgLoading(true);
   }, [currentIndex]);
 
   // Lazily resolve Pixiv high-res URL when a photo is displayed
@@ -271,7 +273,17 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
 
   return (
     <div className="flex flex-col items-center justify-center w-full max-w-5xl mx-auto gap-6 px-4">
-      <div className="relative w-full max-h-[80vh] bg-gray-100 dark:bg-zinc-800 rounded-2xl overflow-y-auto overflow-x-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10 group">
+      <div className="relative w-full min-h-[300px] max-h-[80vh] bg-gray-100 dark:bg-zinc-800 rounded-2xl overflow-y-auto overflow-x-hidden shadow-2xl ring-1 ring-black/5 dark:ring-white/10 group">
+
+        {/* Loading spinner */}
+        {imgLoading && !imgError && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-gray-100/80 dark:bg-zinc-800/80">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-4 border-blue-200 dark:border-blue-800 border-t-blue-500 dark:border-t-blue-400 rounded-full animate-spin" />
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Loading...</p>
+            </div>
+          </div>
+        )}
 
         {imgError ? (
           <div className="flex flex-col items-center gap-3 text-red-500 p-8 text-center bg-white/80 dark:bg-zinc-900/80 rounded-xl backdrop-blur-sm shadow-sm border border-red-100 dark:border-red-900/30 m-8">
@@ -303,8 +315,9 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
                 <img
                   src={getImageUrl(currentPhoto)}
                   alt={currentPhoto.metadata?.prompt || 'Photo'}
-                  className={`w-full h-auto transition-opacity duration-500 ${loading ? 'opacity-50' : 'opacity-100'}`}
-                  onError={() => setImgError(true)}
+                  className={`w-full h-auto transition-opacity duration-500 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
+                  onLoad={() => setImgLoading(false)}
+                  onError={() => { setImgError(true); setImgLoading(false); }}
                 />
               </a>
             ) : (
@@ -312,8 +325,9 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
               <img
                 src={getImageUrl(currentPhoto)}
                 alt={currentPhoto.metadata?.prompt || 'Photo'}
-                className={`w-full h-auto transition-opacity duration-500 ${loading ? 'opacity-50' : 'opacity-100'}`}
-                onError={() => setImgError(true)}
+                className={`w-full h-auto transition-opacity duration-500 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
+                onLoad={() => setImgLoading(false)}
+                onError={() => { setImgError(true); setImgLoading(false); }}
               />
             )}
           </div>
