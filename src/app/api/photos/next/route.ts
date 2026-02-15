@@ -1,37 +1,120 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import connectToDatabase from '@/lib/db';
 import Photo, { IPhoto } from '@/models/Photo';
-// refreshMediaItems removed
 
-
+/**
+ * GET /api/photos/next?count=N&search=query
+ *
+ * Returns photos using weighted random selection that prioritizes:
+ * 1. Photos never viewed (highest priority)
+ * 2. Photos not viewed recently
+ * 3. Photos with fewer total views
+ * 4. Favorited photos get a small boost
+ */
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    
-    // We don't need session here anymore for refreshing, but keeping it for context/future use is fine.
-    // const session = await getServerSession(authOptions);
 
     const searchParams = req.nextUrl.searchParams;
     const count = parseInt(searchParams.get('count') || '1', 10);
     const limit = Math.min(Math.max(count, 1), 50);
+    const search = searchParams.get('search') || '';
 
-    const poolSize = limit * 5;
+    // Build query filter
+    const filter: Record<string, unknown> = {};
+    if (search) {
+      const regex = { $regex: search, $options: 'i' };
+      filter.$or = [
+        { 'metadata.description': regex },
+        { 'metadata.title': regex },
+        { 'metadata.tags': regex },
+        { 'metadata.artist': regex },
+      ];
+    }
 
-    // Fetch candidates
-    const candidates = await Photo.find({})
-      .sort({ lastDisplayedAt: 1, displayCount: 1 })
+    // Fetch a larger pool of candidates to select from
+    const poolSize = Math.max(limit * 10, 100);
+    const totalPhotos = await Photo.countDocuments(filter);
+
+    if (totalPhotos === 0) {
+      return NextResponse.json({ photos: [] });
+    }
+
+    // Get candidates: mix of never-viewed + least-recently-viewed
+    const candidates: IPhoto[] = [];
+
+    // First: photos never viewed (highest priority)
+    const neverViewed = await Photo.find({ ...filter, lastDisplayedAt: null })
       .limit(poolSize)
       .exec();
+    candidates.push(...neverViewed);
+
+    // Then: fill remaining pool with least-recently-viewed
+    if (candidates.length < poolSize) {
+      const remaining = poolSize - candidates.length;
+      const neverViewedIds = candidates.map(c => c._id);
+      const leastRecent = await Photo.find({
+        ...filter,
+        _id: { $nin: neverViewedIds },
+        lastDisplayedAt: { $ne: null },
+      })
+        .sort({ lastDisplayedAt: 1 }) // oldest viewed first
+        .limit(remaining)
+        .exec();
+      candidates.push(...leastRecent);
+    }
 
     if (candidates.length === 0) {
       return NextResponse.json({ photos: [] });
     }
 
-    // Shuffle and slice
-    const shuffled = candidates.sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, limit);
+    // Calculate weights for each candidate
+    const now = Date.now();
+    const weighted = candidates.map(photo => {
+      let weight = 1;
+
+      // Never viewed → highest weight
+      if (!photo.lastDisplayedAt) {
+        weight = 100;
+      } else {
+        // Time since last viewed (in hours)
+        const hoursSinceViewed = (now - photo.lastDisplayedAt.getTime()) / (1000 * 60 * 60);
+        // More hours since viewed = higher weight (logarithmic scale)
+        weight = Math.log2(hoursSinceViewed + 1) + 1;
+      }
+
+      // Penalize frequently viewed photos
+      const viewPenalty = 1 / (1 + photo.displayCount * 0.1);
+      weight *= viewPenalty;
+
+      // Small boost for favorited photos
+      if (photo.isFavorited) {
+        weight *= 1.3;
+      }
+
+      return { photo, weight };
+    });
+
+    // Weighted random selection
+    const selected: IPhoto[] = [];
+    const pool = [...weighted];
+
+    for (let i = 0; i < limit && pool.length > 0; i++) {
+      const totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
+      let random = Math.random() * totalWeight;
+
+      let chosenIndex = 0;
+      for (let j = 0; j < pool.length; j++) {
+        random -= pool[j].weight;
+        if (random <= 0) {
+          chosenIndex = j;
+          break;
+        }
+      }
+
+      selected.push(pool[chosenIndex].photo);
+      pool.splice(chosenIndex, 1); // Remove to avoid duplicates
+    }
 
     return NextResponse.json({ photos: selected });
   } catch (error) {

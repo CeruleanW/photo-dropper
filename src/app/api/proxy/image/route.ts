@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Security: only allow proxying from Pixiv image domains
-  const allowedDomains = ['i.pximg.net', 'i-f.pximg.net', 'i-cf.pximg.net'];
+  const allowedDomains = ['i.pximg.net', 'i-f.pximg.net', 'i-cf.pximg.net', 's.pximg.net'];
   try {
     const parsedUrl = new URL(url);
     if (!allowedDomains.some(d => parsedUrl.hostname === d || parsedUrl.hostname.endsWith('.' + d))) {

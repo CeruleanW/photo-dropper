@@ -185,6 +185,12 @@ async function processWorks(
 
   for (const work of works) {
     try {
+      // Skip restricted/age-gated content (Pixiv returns a placeholder image)
+      if (!work.url || work.url.includes('limit_unknown') || work.url.includes('limit_r18')) {
+        skipped++;
+        continue;
+      }
+
       // Check if already imported
       const existing = await Photo.findOne({
         source: 'PIXIV',

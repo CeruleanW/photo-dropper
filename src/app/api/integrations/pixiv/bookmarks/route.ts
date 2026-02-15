@@ -25,6 +25,16 @@ export async function POST(req: NextRequest) {
 
     const result = await importBookmarks(userId, String(pixivUserId));
 
+    // Clean up any previously imported restricted/placeholder entries
+    await Photo.deleteMany({
+      source: 'PIXIV',
+      $or: [
+        { url: { $regex: 'limit_unknown' } },
+        { url: { $regex: 'limit_r18' } },
+        { url: { $regex: 's.pximg.net/common/images/limit' } },
+      ],
+    });
+
     return NextResponse.json({
       success: true,
       imported: result.imported,
