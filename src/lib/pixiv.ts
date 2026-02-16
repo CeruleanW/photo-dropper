@@ -236,6 +236,7 @@ async function processWorks(
           pixivUrl: `https://www.pixiv.net/artworks/${work.id}`,
           createDate: work.createDate,
           pageCount: work.pageCount,
+          illustType: work.illustType, // 0=illust, 1=manga, 2=ugoira
           resolved: false, // flag: high-res URL not yet fetched
         },
       });

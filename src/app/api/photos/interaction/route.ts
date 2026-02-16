@@ -43,18 +43,22 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Toggle like state atomically (avoids race condition from read-then-write)
+    // Toggle like state
     if (type === 'LIKE') {
-      await Photo.findByIdAndUpdate(photoId, [
-        { $set: { isLiked: { $not: '$isLiked' } } },
-      ]);
+      const photo = await Photo.findById(photoId);
+      if (photo) {
+        photo.isLiked = !photo.isLiked;
+        await photo.save();
+      }
     }
 
-    // Toggle favorite state atomically
+    // Toggle favorite state
     if (type === 'FAVORITE') {
-      await Photo.findByIdAndUpdate(photoId, [
-        { $set: { isFavorited: { $not: '$isFavorited' } } },
-      ]);
+      const photo = await Photo.findById(photoId);
+      if (photo) {
+        photo.isFavorited = !photo.isFavorited;
+        await photo.save();
+      }
     }
 
     return NextResponse.json({ success: true, interaction });

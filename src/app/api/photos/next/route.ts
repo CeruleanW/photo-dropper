@@ -24,9 +24,26 @@ export async function GET(req: NextRequest) {
     const count = parseInt(searchParams.get('count') || '1', 10);
     const limit = Math.min(Math.max(count, 1), 50);
     const search = searchParams.get('search') || '';
+    const source = searchParams.get('source') || '';
+    const tagsParam = searchParams.get('tags') || '';
 
     // Build query filter
     const filter: Record<string, unknown> = {};
+
+    // Source filter
+    if (source) {
+      filter.source = source;
+    }
+
+    // Tags filter (comma-separated, match ALL specified tags)
+    if (tagsParam) {
+      const tags = tagsParam.split(',').map(t => t.trim()).filter(Boolean).slice(0, 20);
+      if (tags.length > 0) {
+        filter['metadata.tags'] = { $all: tags };
+      }
+    }
+
+    // Text search filter
     if (search) {
       const safeSearch = search.slice(0, 200);
       const regex = { $regex: escapeRegex(safeSearch), $options: 'i' };

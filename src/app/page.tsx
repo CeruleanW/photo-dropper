@@ -5,10 +5,12 @@ import PhotoViewer from '@/components/PhotoViewer';
 import GooglePhotosIntegration from '@/components/GooglePhotosIntegration';
 import PixivIntegration from '@/components/PixivIntegration';
 import SearchBar from '@/components/SearchBar';
+import FilterBar, { PhotoFilters } from '@/components/FilterBar';
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [filters, setFilters] = useState<PhotoFilters>({ tags: [] });
 
   const handleImportSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -45,8 +47,9 @@ export default function Home() {
         </div>
 
         {/* Main Content Card */}
-        <div className="bg-white/50 dark:bg-zinc-900/50 backdrop-blur-lg rounded-3xl p-4 md:p-8 shadow-2xl border border-white/20 dark:border-zinc-800">
-          <PhotoViewer searchQuery={searchQuery} refreshTrigger={refreshTrigger} />
+        <div className="bg-white/50 dark:bg-zinc-900/50 backdrop-blur-lg rounded-3xl p-4 md:p-8 shadow-2xl border border-white/20 dark:border-zinc-800 flex flex-col gap-5">
+          <FilterBar filters={filters} onChange={setFilters} />
+          <PhotoViewer searchQuery={searchQuery} refreshTrigger={refreshTrigger} filters={filters} />
         </div>
       </div>
     </main>

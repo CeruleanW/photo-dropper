@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Controls from './Controls';
 import MetadataEditor from './MetadataEditor';
+import UgoiraPlayer from './UgoiraPlayer';
 import { Photo } from '@/types';
 
 // Pixiv images need to be proxied server-side due to hotlink protection
 function getProxiedPixivUrl(url: string): string {
-  if (url.includes('pximg.net')) {
+  if (url.includes('pximg.net') || url.includes('ugoira.com')) {
     return `/api/proxy/image?url=${encodeURIComponent(url)}`;
   }
   return url;
@@ -21,12 +22,15 @@ function getImageUrl(photo: Photo): string {
   return photo.url;
 }
 
+import { PhotoFilters } from './FilterBar';
+
 interface PhotoViewerProps {
   searchQuery?: string;
-  refreshTrigger?: number; // Add Prop
+  refreshTrigger?: number;
+  filters?: PhotoFilters;
 }
 
-export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewerProps) {
+export default function PhotoViewer({ searchQuery, refreshTrigger, filters }: PhotoViewerProps) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -48,7 +52,9 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
   useEffect(() => {
     if (!currentPhoto) return;
     if (currentPhoto.source !== 'PIXIV') return;
-    if (currentPhoto.metadata?.resolved) return;
+    // Skip resolve if already resolved AND we know the type.
+    // Re-resolve if illustType is unknown (old import that may be ugoira resolved with broken logic).
+    if (currentPhoto.metadata?.resolved && currentPhoto.metadata?.illustType !== undefined) return;
 
     // Resolve in background — thumbnail shows immediately via proxy
     (async () => {
@@ -56,7 +62,7 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
         const res = await fetch(`/api/integrations/pixiv/resolve?id=${currentPhoto._id}`);
         const data = await res.json();
         if (data.success && data.url) {
-          // Update the photo in state with the resolved high-res URL and pages
+          // Update the photo in state with the resolved high-res URL, pages, and ugoira data
           setPhotos(prev => prev.map(p =>
             p._id === currentPhoto._id
               ? {
@@ -65,7 +71,12 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
                 metadata: {
                   ...p.metadata,
                   resolved: true,
+                  ...(data.illustType !== undefined ? { illustType: data.illustType } : {}),
                   ...(data.pages ? { pages: data.pages } : {}),
+                  ...(data.ugoiraZipUrl ? {
+                    ugoiraZipUrl: data.ugoiraZipUrl,
+                    ugoiraFrames: data.ugoiraFrames,
+                  } : {}),
                 },
               }
               : p
@@ -88,12 +99,12 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
     }
   }, [refreshTrigger]);
 
-  // Reset photos when searchQuery changes
+  // Reset photos when searchQuery or filters change
   useEffect(() => {
     setPhotos([]);
     setCurrentIndex(0);
     setHasMore(true);
-  }, [searchQuery]);
+  }, [searchQuery, filters?.source, filters?.tags]);
   const [hasMore, setHasMore] = useState(true);
 
   const fetchPhotos = useCallback(async (count = 25): Promise<number> => {
@@ -101,9 +112,17 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
     setError(null);
     let newCount = 0;
     try {
-      let url = `/api/photos/next?count=${count}`;
+      let url: string;
+      // Build filter query params
+      const filterParams = new URLSearchParams();
+      if (filters?.source) filterParams.set('source', filters.source);
+      if (filters?.tags?.length) filterParams.set('tags', filters.tags.join(','));
+      const filterSuffix = filterParams.toString() ? `&${filterParams.toString()}` : '';
+
       if (searchQuery) {
-        url = `/api/photos/search?q=${encodeURIComponent(searchQuery)}&limit=${count}`;
+        url = `/api/photos/search?q=${encodeURIComponent(searchQuery)}&limit=${count}${filterSuffix}`;
+      } else {
+        url = `/api/photos/next?count=${count}${filterSuffix}`;
       }
 
       const res = await fetch(url);
@@ -146,7 +165,7 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
       setLoading(false);
     }
     return newCount;
-  }, [searchQuery, refreshTrigger]);
+  }, [searchQuery, refreshTrigger, filters]);
 
   // Initial fetch when photos array is empty
   useEffect(() => {
@@ -323,8 +342,15 @@ export default function PhotoViewer({ searchQuery, refreshTrigger }: PhotoViewer
           </div>
         ) : (
           <div className="w-full">
-            {/* Multi-page Pixiv artwork: render all pages vertically */}
-            {currentPhoto.source === 'PIXIV' && currentPhoto.metadata?.pages?.length > 1 ? (
+            {/* Ugoira (animated Pixiv artwork) */}
+            {currentPhoto.metadata?.ugoiraZipUrl && currentPhoto.metadata?.ugoiraFrames ? (
+              <UgoiraPlayer
+                zipUrl={getProxiedPixivUrl(currentPhoto.metadata.ugoiraZipUrl)}
+                frames={currentPhoto.metadata.ugoiraFrames}
+                onLoad={() => setImgLoading(false)}
+                onError={() => { setImgError(true); setImgLoading(false); }}
+              />
+            ) : currentPhoto.source === 'PIXIV' && currentPhoto.metadata?.pages?.length > 1 ? (
               currentPhoto.metadata!.pages.map((pageUrl: string, idx: number) => (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
