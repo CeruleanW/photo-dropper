@@ -1,7 +1,9 @@
-import { NextAuthOptions } from "next-auth";
+import { getServerSession, NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { MongoDBAdapter } from "@next-auth/mongodb-adapter";
 import clientPromise from "@/lib/mongodb";
+
+export const ANONYMOUS_USER_ID = "507f1f77bcf86cd799439011";
 
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
@@ -30,3 +32,8 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
+
+export async function getServerUserId(): Promise<string> {
+  const session = await getServerSession(authOptions);
+  return session?.user?.id ?? ANONYMOUS_USER_ID;
+}

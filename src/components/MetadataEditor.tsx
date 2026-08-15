@@ -1,18 +1,39 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Photo } from '@/types';
+import { useSession } from 'next-auth/react';
+import { Photo, PhotoComment } from '@/types';
 
 interface MetadataEditorProps {
   photo: Photo;
   onUpdate: (updatedPhoto: Photo) => void;
 }
 
+function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const diff = Date.now() - then;
+  const sec = Math.max(0, Math.floor(diff / 1000));
+  if (sec < 60) return 'just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 export default function MetadataEditor({ photo, onUpdate }: MetadataEditorProps) {
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const [tagInput, setTagInput] = useState('');
   const [commentInput, setCommentInput] = useState('');
   const [descriptionInput, setDescriptionInput] = useState((photo.metadata as any)?.description || '');
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
+  const [comments, setComments] = useState<PhotoComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [posting, setPosting] = useState(false);
 
   // Safely access tags from metadata
   const tags: string[] = (photo.metadata as any)?.tags || [];
@@ -21,6 +42,27 @@ export default function MetadataEditor({ photo, onUpdate }: MetadataEditorProps)
   useEffect(() => {
     setDescriptionInput((photo.metadata as any)?.description || '');
   }, [photo._id, photo.metadata]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setCommentsLoading(true);
+      try {
+        const res = await fetch(`/api/photos/${photo._id}/comments`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setComments(data.comments || []);
+        } else if (!cancelled) {
+          setComments([]);
+        }
+      } catch {
+        if (!cancelled) setComments([]);
+      } finally {
+        if (!cancelled) setCommentsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [photo._id]);
 
   const handleSaveDescription = async () => {
     try {
@@ -62,26 +104,30 @@ export default function MetadataEditor({ photo, onUpdate }: MetadataEditorProps)
 
   const handleAddComment = async () => {
     if (!commentInput.trim()) return;
-
+    setPosting(true);
     try {
-      const dummyUserId = '507f1f77bcf86cd799439011';
-      await fetch('/api/photos/interaction', {
+      const res = await fetch('/api/photos/interaction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: dummyUserId,
           photoId: photo._id,
           type: 'COMMENT',
-          metadata: { text: commentInput.trim() }
+          metadata: { text: commentInput.trim() },
         }),
       });
 
-      // We don't necessarily update the photo object for comments unless we store them there.
-      // But we could show a success message.
-      setCommentInput('');
-      alert('Comment added!');
+      if (res.ok) {
+        setCommentInput('');
+        const cRes = await fetch(`/api/photos/${photo._id}/comments`);
+        if (cRes.ok) {
+          const data = await cRes.json();
+          setComments(data.comments || []);
+        }
+      }
     } catch (error) {
       console.error('Failed to add comment', error);
+    } finally {
+      setPosting(false);
     }
   };
 
@@ -145,6 +191,28 @@ export default function MetadataEditor({ photo, onUpdate }: MetadataEditorProps)
 
           {/* Comments Section */}
           <div className="pt-2 border-t border-gray-100 dark:border-zinc-700">
+            {commentsLoading ? (
+              <p className="text-xs text-gray-400 mb-2">Loading comments...</p>
+            ) : comments.length > 0 ? (
+              <ul className="flex flex-col gap-2 mb-2 max-h-48 overflow-y-auto">
+                {comments.map((c) => {
+                  const mine = !!(currentUserId && c.userId === currentUserId);
+                  return (
+                    <li
+                      key={c._id}
+                      className="flex flex-col gap-0.5 px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-zinc-900/60 border border-gray-100 dark:border-zinc-700"
+                    >
+                      <span className="text-sm text-gray-700 dark:text-gray-200 break-words whitespace-pre-wrap">{c.text}</span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                        {mine ? 'You' : 'Guest'} · {timeAgo(c.createdAt)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-xs text-gray-400 italic mb-2">No comments yet</p>
+            )}
             <textarea
               value={commentInput}
               onChange={(e) => setCommentInput(e.target.value)}
@@ -153,8 +221,12 @@ export default function MetadataEditor({ photo, onUpdate }: MetadataEditorProps)
               className="w-full px-3 py-2 text-sm border rounded bg-transparent dark:border-zinc-600 dark:text-white resize-none"
             />
             <div className="flex justify-end mt-1">
-              <button onClick={handleAddComment} className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
-                Post Comment
+              <button
+                onClick={handleAddComment}
+                disabled={posting || !commentInput.trim()}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {posting ? 'Posting...' : 'Post Comment'}
               </button>
             </div>
           </div>

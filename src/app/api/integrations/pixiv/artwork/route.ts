@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Photo from '@/models/Photo';
+import { getServerUserId } from '@/lib/auth';
 
 const PIXIV_BASE = 'https://www.pixiv.net';
 
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     // Check if already exists
-    const userId = '507f1f77bcf86cd799439011';
+    const userId = await getServerUserId();
     const existing = await Photo.findOne({ source: 'PIXIV', externalId: illustId, userId });
     if (existing) {
       return NextResponse.json({ success: true, skipped: true, photo: existing });

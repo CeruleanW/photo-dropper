@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { importBookmarks } from '@/lib/pixiv';
 import connectToDatabase from '@/lib/db';
 import Photo from '@/models/Photo';
+import { getServerUserId } from '@/lib/auth';
 
 /**
  * POST /api/integrations/pixiv/bookmarks
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Use a dummy userId for now (single-user app)
-    const userId = '507f1f77bcf86cd799439011';
+    const userId = await getServerUserId();
 
     const result = await importBookmarks(userId, String(pixivUserId));
 

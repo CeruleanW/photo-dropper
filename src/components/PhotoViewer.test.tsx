@@ -99,9 +99,11 @@ describe('PhotoViewer Component', () => {
       photoId: '1',
       type: 'LIKE',
     });
+    // userId must be derived server-side; the client must never send it
+    expect(JSON.parse(likeCall[1].body)).not.toHaveProperty('userId');
   });
 
-  it('displays empty state with seed button when no photos', async () => {
+  it('displays empty state with retry button when no photos', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ photos: [] }),
@@ -111,7 +113,9 @@ describe('PhotoViewer Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No photos found.')).toBeInTheDocument();
-      expect(screen.getByText('Seed Database with Sample Photos')).toBeInTheDocument();
     });
+
+    expect(screen.getByText('Try importing photos from Google or check back later.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
   });
 });

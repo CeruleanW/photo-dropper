@@ -3,29 +3,32 @@ import connectToDatabase from '@/lib/db';
 import Interaction from '@/models/Interaction';
 import Photo from '@/models/Photo';
 import User from '@/models/User'; // We might need this later for user-specific tracking
+import { getServerUserId } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
     
     const body = await req.json();
-    const { userId, photoId, type, metadata } = body;
+    const { photoId, type, metadata } = body;
 
     // Validate input
-    if (!userId || !photoId || !type) {
+    if (!photoId || !type) {
       return NextResponse.json(
-        { error: 'Missing required fields: userId, photoId, type' },
+        { error: 'Missing required fields: photoId, type' },
         { status: 400 }
       );
     }
 
-    const validTypes = ['VIEW', 'LIKE', 'DISLIKE', 'SKIP', 'FAVORITE'];
+    const validTypes = ['VIEW', 'LIKE', 'DISLIKE', 'SKIP', 'FAVORITE', 'COMMENT'];
     if (!validTypes.includes(type)) {
       return NextResponse.json(
         { error: 'Invalid interaction type' },
         { status: 400 }
       );
     }
+
+    const userId = await getServerUserId();
 
     // Record interaction
     const interaction = await Interaction.create({

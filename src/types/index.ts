@@ -15,7 +15,14 @@ export interface Interaction {
   _id: string;
   userId: string;
   photoId: string;
-  type: 'VIEW' | 'LIKE' | 'DISLIKE' | 'SKIP' | 'FAVORITE';
+  type: 'VIEW' | 'LIKE' | 'DISLIKE' | 'SKIP' | 'FAVORITE' | 'COMMENT';
   metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface PhotoComment {
+  _id: string;
+  userId: string;
+  text: string;
   createdAt: string;
 }

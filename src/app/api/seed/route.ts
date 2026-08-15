@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Photo from '@/models/Photo';
+import { ANONYMOUS_USER_ID } from '@/lib/auth';
 
 export async function POST() {
   try {
@@ -13,7 +14,7 @@ export async function POST() {
     }
 
     const samplePhotos = Array.from({ length: 20 }).map((_, i) => ({
-      userId: '507f1f77bcf86cd799439011',
+      userId: ANONYMOUS_USER_ID,
       source: 'LOCAL',
       externalId: `seed-${i}`,
       url: `https://picsum.photos/seed/${i}/800/600`, // Use lorem picsum for placeholders

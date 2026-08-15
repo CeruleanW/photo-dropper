@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IInteraction extends Document {
   userId: mongoose.Types.ObjectId;
   photoId: mongoose.Types.ObjectId;
-  type: 'VIEW' | 'LIKE' | 'DISLIKE' | 'SKIP' | 'FAVORITE';
+  type: 'VIEW' | 'LIKE' | 'DISLIKE' | 'SKIP' | 'FAVORITE' | 'COMMENT';
   metadata?: Record<string, any>;
   createdAt: Date;
 }
@@ -14,7 +14,7 @@ const InteractionSchema: Schema = new Schema(
     photoId: { type: Schema.Types.ObjectId, ref: 'Photo', required: true },
     type: {
       type: String,
-      enum: ['VIEW', 'LIKE', 'DISLIKE', 'SKIP', 'FAVORITE'],
+      enum: ['VIEW', 'LIKE', 'DISLIKE', 'SKIP', 'FAVORITE', 'COMMENT'],
       required: true,
     },
     metadata: { type: Map, of: Schema.Types.Mixed, default: {} },

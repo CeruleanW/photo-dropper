@@ -206,11 +206,6 @@ export default function PhotoViewer({ searchQuery, refreshTrigger, filters }: Ph
     // Optimistic UI updates could happen here
     console.log(`User interaction: ${type} on photo ${currentPhoto._id}`);
 
-    // Call API to record interaction
-    // Note: We need a userId. For now, we'll use a dummy ID or generate one if not auth'd.
-    // In a real app, get from session.
-    const dummyUserId = '507f1f77bcf86cd799439011'; // Mock ObjectId
-
     try {
       await fetch('/api/photos/interaction', {
         method: 'POST',
@@ -218,7 +213,6 @@ export default function PhotoViewer({ searchQuery, refreshTrigger, filters }: Ph
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: dummyUserId,
           photoId: currentPhoto._id,
           type,
         }),
